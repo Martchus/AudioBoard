@@ -11,7 +11,6 @@ Grundsystem, umrechnung FFT-Daten, kalibrierung
 #include "animation.h"
 #include "CFFT.h"
 #include "ffft.h"
-#include "animations.h"
 #include "global.h"
 
 // nutzdaten
@@ -28,19 +27,8 @@ uint8_t ma_spectrum_wpos, ma_spectrum_rpos;
 
 #define ANIM_INPUT_PER_SECOND	20		// anzahl aufrufe anim_input pro sekunde
 
-uint8_t anim_buffer[ANIM_BUFFER_SIZE];
-void (*anim_frame_func)(void);
-
 bands_calibration_t b_calib;
 bands_calibration_t EEMEM b_calib_eeprom;
-
-// flags für system
-uint8_t anim_flags, anim_cur = 0;
-uint32_t anim_next_tick = 0, anim_change_delay = 60000;
-
-anim_list_t anim_list[ANIM_LIST_NUM] = {
-					{"Leer", NULL, NULL}
-									};
 
 void anim_init()
 {	
@@ -82,55 +70,11 @@ void anim_init()
 	bpm_h = 0;
 	bpm_m = 0;
 	bpm_l = 0;
-	
-	anim_frame_func = NULL;
-	
-	anim_flags = 0;
 }
 
 void anim_frame()
 {
-	if(anim_flags & ANIM_FLAG_CHANGE)
-	{
-		if(systick >= anim_next_tick)
-		{
-			anim_next_tick = systick + anim_change_delay;
-			
-			if(anim_flags & ANIM_FLAG_RANDOM)
-			{
-				if(anim_flags & ANIM_FLAG_NOREPEAT)
-				{
-					uint8_t temp;
-					
-					do {
-						temp = rand() % ANIM_LIST_NUM;
-					} while(temp == anim_cur);
-					
-					anim_cur = temp;
-				}
-				else
-				{
-					anim_cur = rand() % ANIM_LIST_NUM;
-				}
-			}
-			else
-			{
-				anim_cur = (anim_cur + 1) % ANIM_LIST_NUM;
-			}
-			
-			if(anim_list[anim_cur].init)
-			{
-				anim_list[anim_cur].init();
-			}
-	
-			anim_frame_func = anim_list[anim_cur].step;			
-		}
-	}
-	
-	if(anim_frame_func)
-	{
-		anim_frame_func();
-	}
+	// TODO: animation einfügen
 }
 
 /*
@@ -405,153 +349,4 @@ void anim_inputData(fft_result_t *left, fft_result_t *right)
 		lcd.print(7, LCD_STYLE_NOCLEAR | LCD_STYLE_RIGHT, "%u", zoom);
 	}
 #endif
-}
-
-//
-// "animation" für kalibration
-//
-
-#define ANIM_CALIB_CNT		32
-#define ANIM_CALIB_ROUND	5
-
-typedef struct
-{
-	uint8_t cnt, round;
-	uint32_t s_left[ANIM_CALIB_ROUND][ANIM_BAND_NUM], s_right[ANIM_CALIB_ROUND][ANIM_BAND_NUM];
-	uint32_t a_left[ANIM_CALIB_ROUND], a_right[ANIM_CALIB_ROUND];
-	uint16_t max_a_left, max_a_right, max_s_left[ANIM_BAND_NUM], max_s_right[ANIM_BAND_NUM];
-} calib_anim_t;
-
-void anim_frameCalibration()
-{
-	calib_anim_t *d = (calib_anim_t*)anim_buffer;
-	uint8_t i;
-	
-	for(i = 0; i < ANIM_BAND_NUM; i++)
-	{
-		d->s_left[d->round][i] += bands_l[i];
-		if(bands_l[i] > d->max_s_left[i])
-		{
-			d->max_s_left[i] = bands_l[i];
-		}
-		
-		d->s_right[d->round][i] += bands_r[i];
-		if(bands_r[i] > d->max_s_right[i])
-		{
-			d->max_s_right[i] = bands_r[i];
-		}
-	}
-	
-	d->a_left[d->round] += amplitude_l;
-	if(amplitude_l > d->max_a_left)
-	{
-		d->max_a_left = amplitude_l;
-	}
-	
-	d->a_right[d->round] += amplitude_r;
-	if(amplitude_r > d->max_a_right)
-	{
-		d->max_a_right = amplitude_r;
-	}
-	
-	d->cnt++;
-	
-	if(d->cnt >= ANIM_CALIB_CNT)
-	{
-		// runde beendet
-		d->cnt = 0;
-		
-		d->a_left[d->round] /= ANIM_CALIB_CNT;
-		d->a_right[d->round] /= ANIM_CALIB_CNT;
-		
-		for(i = 0; i < ANIM_BAND_NUM; i++)
-		{
-			d->s_left[d->round][i] /= ANIM_CALIB_CNT;
-			d->s_right[d->round][i] /= ANIM_CALIB_CNT;
-		}
-				
-		d->round++;
-		if(d->round >= ANIM_CALIB_ROUND)
-		{
-			// fertig, auswerten
-			uint32_t s_temp_l[ANIM_BAND_NUM], s_temp_r[ANIM_BAND_NUM], a_temp_l, a_temp_r;
-			uint8_t j;
-			
-			memset(s_temp_l, 0, sizeof(uint32_t) * ANIM_BAND_NUM);
-			memset(s_temp_r, 0, sizeof(uint32_t) * ANIM_BAND_NUM);
-			a_temp_l = 0;
-			a_temp_r = 0;
-			
-			for(i = 0; i < ANIM_CALIB_ROUND; i++)
-			{
-				a_temp_l += d->a_left[i];
-				a_temp_r += d->a_right[i];
-				
-				for(j = 0; j < ANIM_BAND_NUM; j++)
-				{
-					s_temp_l[j] += d->s_left[i][j];
-					s_temp_r[j] += d->s_right[i][j];
-				}
-			}
-			
-			a_temp_l /= ANIM_CALIB_ROUND;
-			a_temp_r /= ANIM_CALIB_ROUND;
-			for(i = 0; i < ANIM_BAND_NUM; i++)
-			{
-				s_temp_l[i] /= ANIM_CALIB_ROUND;
-				s_temp_r[i] /= ANIM_CALIB_ROUND;
-			}
-			
-			b_calib.ident = ANIM_CALIB_IDENT;
-			b_calib.amplitude_l = (7 * d->max_a_left + a_temp_l) / 8;
-			b_calib.amplitude_r = (7 * d->max_a_right + a_temp_r) / 8;
-			for(i = 0; i < ANIM_BAND_NUM; i++)
-			{
-				b_calib.bands_calib_l[i] = (7 * d->max_s_left[i] + s_temp_l[i]) / 8;
-				b_calib.bands_calib_r[i] = (7 * d->max_s_right[i] + s_temp_r[i]) / 8;
-			}
-			
-			
-			// !!!
-//			eeprom_write_block((void*)&b_calib, (void*)&b_calib_eeprom, sizeof(bands_calibration_t));
-			
-			anim_frame_func = NULL;
-		}
-	}
-}
-
-void anim_startCalibration()
-{
-	calib_anim_t *d = (calib_anim_t*)anim_buffer;
-	
-	memset(&b_calib, 0, sizeof(bands_calibration_t));
-	memset(d, 0, sizeof(calib_anim_t));
-	
-	anim_frame_func = anim_frameCalibration;
-}
-
-void anim_start(uint16_t num)
-{
-	if(num >= ANIM_LIST_NUM)
-	{
-		return;
-	}
-	
-	if(anim_list[num].init)
-	{
-		anim_list[num].init();
-	}
-	
-	anim_cur = num;
-	anim_frame_func = anim_list[num].step;
-}
-
-void anim_setFlags(uint8_t f)
-{
-	anim_flags = f;
-}
-
-void anim_setDelay(uint32_t d)
-{
-	anim_change_delay = d;
 }

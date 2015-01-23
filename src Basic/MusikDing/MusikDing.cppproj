@@ -149,12 +149,6 @@
     <Compile Include="animation.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="animations.cpp">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="animations.h">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="CFFT.cpp">
       <SubType>compile</SubType>
     </Compile>

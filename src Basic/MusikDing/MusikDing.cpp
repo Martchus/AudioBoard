@@ -93,10 +93,6 @@ int main(void)
 	
 	PMIC.CTRL |= (PMIC_LOLVLEN_bm | PMIC_MEDLVLEN_bm | PMIC_HILVLEN_bm);
 	sei();
-
-	anim_start(3);
-	anim_setDelay(30000);
-	anim_setFlags(ANIM_FLAG_RANDOM | ANIM_FLAG_CHANGE | ANIM_FLAG_NOREPEAT);
 	
     while(1)
     {	
@@ -120,7 +116,7 @@ int main(void)
 #ifdef __APS_DEBUG__
 			_fps++;
 #endif
-			// TODO: Animationssysten anpassen bzw. eigenes System schreiben
+			// TODO: Animations anpassen bzw. eigenes System schreiben
 			anim_frame();
 
 			flags &= ~FLAG_FRAME;
