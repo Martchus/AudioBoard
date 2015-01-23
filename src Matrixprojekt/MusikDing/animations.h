@@ -13,5 +13,8 @@ void anim_partikel1_step();
 void anim_kreisding_init();
 void anim_kreisding_step();
 
+void anim_punkte_init();
+void anim_punkte_step();
+
 
 #endif /* ANIMATIONS_H_ */

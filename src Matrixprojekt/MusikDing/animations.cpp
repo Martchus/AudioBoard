@@ -507,7 +507,7 @@ void anim_partikel1_step()
 /*
 kreisding
 */
-#define KREISDING_MA			16
+#define KREISDING_MA			64
 #define KREISDING_FAKTOR		128
 #define KREISDING_MAX_X			(LED_NUM_X * KREISDING_FAKTOR)
 #define KREISDING_MAX_Y			(LED_NUM_Y * KREISDING_FAKTOR)
@@ -515,7 +515,7 @@ typedef struct
 {
 	uint16_t x, y;				// position
 	uint16_t zx, zy;			// ziel
-	uint16_t offset_ma;				// für farbe
+	uint32_t offset_ma;			// für farbe
 	uint8_t offset;
 } a_kreisding_t;
 
@@ -594,8 +594,19 @@ void anim_kreisding_step()
 		d->zy= rand() % KREISDING_MAX_Y;
 	}
 	
-	d->offset_ma = ((d->offset_ma * (KREISDING_MA - 1)) + ((fft_bucket_h_l + fft_bucket_h_r) / 2)) / KREISDING_MA;
-	d->offset += d->offset_ma;
+	temp = bpm_all;
+	d->offset_ma = ((d->offset_ma * (KREISDING_MA - 1)) + temp) / KREISDING_MA;
+	
+	temp = d->offset_ma >> 5;
+	if(temp > 8)
+	{
+		temp = 8;
+	}
+	else if(temp == 0)
+	{
+		temp = 1;
+	}
+	d->offset += temp;
 	
 	for(x = 0; x < LED_NUM_X; x++)
 	{
@@ -606,8 +617,91 @@ void anim_kreisding_step()
 			
 			temp = sqrt(tempx * tempx + tempy * tempy);
 			
-			led.setLED_HSV(x, y, (temp / 3) + d->offset, 255, 200);
+			led.setLED_HSV(x, y, (temp / 5) + d->offset, 255, 200);
 		}
 	}
+	led.update();
+}
+
+/*
+punkte
+*/
+typedef struct
+{
+	uint8_t cnt;
+} a_punkte_t;
+
+void anim_punkte_init()
+{
+	a_punkte_t *d = (a_punkte_t*)anim_buffer;
+	
+	d->cnt = 0;
+}
+
+void anim_punkte_step()
+{
+	a_punkte_t *d = (a_punkte_t*)anim_buffer;
+	uint8_t x, y, hue = 0;
+	int8_t offset;
+	rgb_t *col, c;
+		
+	// feld dimmen
+	for(x = 0; x < LED_NUM_X; x++)
+	{
+		for(y = 0; y < LED_NUM_Y; y++)
+		{
+			col = led.getLED(x, y);
+			
+			if(col->r)
+			{
+				col->r--;
+			}
+			
+			if(col->g)
+			{
+				col->g--;
+			}
+			
+			if(col->b)
+			{
+				col->b--;
+			}
+		}
+	}
+
+	if(beats & BEAT_LOW)
+	{
+		offset = (int8_t)(bpm_l - ((int16_t)bpm_l / 2));
+		hue = 0 + offset + (rand() % 16);
+		led.setLED_HSV(&c, hue, 255, (rand() % 100) + 150);
+		col = led.getLED(rand() % LED_NUM_X, rand() % LED_NUM_Y);
+		col->r |= c.r;
+		col->g |= c.g;
+		col->b |= c.b;
+//		beats &= ~BEAT_LOW;
+	}
+	if(beats & BEAT_MID)
+	{
+		offset = (int8_t)(bpm_m - ((int16_t)bpm_m / 2));
+		hue = 82 + offset + (rand() % 16);
+		led.setLED_HSV(&c, hue, 255, (rand() % 100) + 150);
+		col = led.getLED(rand() % LED_NUM_X, rand() % LED_NUM_Y);
+		col->r |= c.r;
+		col->g |= c.g;
+		col->b |= c.b;			
+//		beats &= ~BEAT_MID;
+	}
+	if(beats & BEAT_HIGH)
+	{
+		offset = (int8_t)(bpm_h - ((int16_t)bpm_h / 2));
+		hue = 164 + offset + (rand() % 16);
+		led.setLED_HSV(&c, hue, 255, (rand() % 100) + 150);
+		col = led.getLED(rand() % LED_NUM_X, rand() % LED_NUM_Y);
+		col->r |= c.r;
+		col->g |= c.g;
+		col->b |= c.b;
+//		beats &= ~BEAT_HIGH;
+	}
+
 	led.update();
 }

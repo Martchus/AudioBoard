@@ -101,9 +101,9 @@ int main(void)
 	PMIC.CTRL |= (PMIC_LOLVLEN_bm | PMIC_MEDLVLEN_bm | PMIC_HILVLEN_bm);
 	sei();
 
-	anim_start(3);
+	anim_start(4);
 	anim_setDelay(30000);
-//	anim_setFlags(ANIM_FLAG_RANDOM | ANIM_FLAG_CHANGE | ANIM_FLAG_NOREPEAT);
+	anim_setFlags(ANIM_FLAG_RANDOM | ANIM_FLAG_CHANGE | ANIM_FLAG_NOREPEAT);
 	
     while(1)
     {	

@@ -49,7 +49,8 @@ anim_list_t anim_list[ANIM_LIST_NUM] = {
 					{"Spektrum Mono", anim_monospektrum_init, anim_monospektrum_step},
 					{"Spektrum Stereo", anim_stereospektrum_init, anim_stereospektrum_step},
 					{"Partikel 1", anim_partikel1_init, anim_partikel1_step},
-					{"Kreisding", anim_kreisding_init, anim_kreisding_step}
+					{"Kreisding", anim_kreisding_init, anim_kreisding_step},
+					{"Punkte", anim_punkte_init, anim_punkte_step}
 									};
 
 void anim_init()
