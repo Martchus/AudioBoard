@@ -29,7 +29,7 @@ typedef struct
 	uint16_t amplitude_l, amplitude_r;
 } bands_calibration_t;
 
-#define ANIM_LIST_NUM	5
+#define ANIM_LIST_NUM	7
 
 typedef struct
 {

@@ -16,5 +16,10 @@ void anim_kreisding_step();
 void anim_punkte_init();
 void anim_punkte_step();
 
+void anim_tropfen_init();
+void anim_tropfen_step();
+
+void anim_amplitude1_init();
+void anim_amplitude1_step();
 
 #endif /* ANIMATIONS_H_ */

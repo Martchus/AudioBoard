@@ -55,7 +55,7 @@ void anim_monospektrum_step()
 	
 	for(x = 0; x < ANIM_BAND_NUM; x++)
 	{
-		d->band_soll[x] = (bands_l[x] + bands_r[x]);	// /2
+		d->band_soll[x] = (bands_l[x] + bands_r[x]) * 1.5f;	// /2
 		
 		if(d->band_soll[x] > d->band_ist[x])
 		{
@@ -420,7 +420,7 @@ void anim_partikel1_step()
 		}
 
 		// oben<->unten
-		if(beats & BEAT_MID)
+		if((beats & BEAT_MID) || (!beats && (rand() % 100 > 50)))
 		{
 			d->partikel[temp].dx = rand() & 1;
 			
@@ -626,21 +626,13 @@ void anim_kreisding_step()
 /*
 punkte
 */
-typedef struct
-{
-	uint8_t cnt;
-} a_punkte_t;
-
 void anim_punkte_init()
 {
-	a_punkte_t *d = (a_punkte_t*)anim_buffer;
 	
-	d->cnt = 0;
 }
 
 void anim_punkte_step()
 {
-	a_punkte_t *d = (a_punkte_t*)anim_buffer;
 	uint8_t x, y, hue = 0;
 	int8_t offset;
 	rgb_t *col, c;
@@ -666,6 +658,11 @@ void anim_punkte_step()
 			{
 				col->b--;
 			}
+			
+			if(!col->r && !col->g && !col->b && (rand() % 100 > 90))
+			{
+				led.setLED_HSV(x, y, rand() & 0xFF, 255, 50);
+			}
 		}
 	}
 
@@ -673,7 +670,7 @@ void anim_punkte_step()
 	{
 		offset = (int8_t)(bpm_l - ((int16_t)bpm_l / 2));
 		hue = 0 + offset + (rand() % 16);
-		led.setLED_HSV(&c, hue, 255, (rand() % 100) + 150);
+		led.setLED_HSV(&c, hue, 255, (rand() % 50) + 200);
 		col = led.getLED(rand() % LED_NUM_X, rand() % LED_NUM_Y);
 		col->r |= c.r;
 		col->g |= c.g;
@@ -684,7 +681,7 @@ void anim_punkte_step()
 	{
 		offset = (int8_t)(bpm_m - ((int16_t)bpm_m / 2));
 		hue = 82 + offset + (rand() % 16);
-		led.setLED_HSV(&c, hue, 255, (rand() % 100) + 150);
+		led.setLED_HSV(&c, hue, 255, (rand() % 50) + 200);
 		col = led.getLED(rand() % LED_NUM_X, rand() % LED_NUM_Y);
 		col->r |= c.r;
 		col->g |= c.g;
@@ -695,7 +692,7 @@ void anim_punkte_step()
 	{
 		offset = (int8_t)(bpm_h - ((int16_t)bpm_h / 2));
 		hue = 164 + offset + (rand() % 16);
-		led.setLED_HSV(&c, hue, 255, (rand() % 100) + 150);
+		led.setLED_HSV(&c, hue, 255, (rand() % 50) + 200);
 		col = led.getLED(rand() % LED_NUM_X, rand() % LED_NUM_Y);
 		col->r |= c.r;
 		col->g |= c.g;
@@ -703,5 +700,250 @@ void anim_punkte_step()
 //		beats &= ~BEAT_HIGH;
 	}
 
+	led.update();
+}
+
+/*
+tropfen
+*/
+// umrechnung LED x/y in virtuelles x/y
+#define TROPFEN_FAKTOR			128
+#define TROPFEN_MAX_X			(LED_NUM_X * KREISDING_FAKTOR)
+#define TROPFEN_MAX_Y			(LED_NUM_Y * KREISDING_FAKTOR)
+
+// größe umfeld vom mittelpunkt
+#define TROPFEN_UMFELD			2
+#define TROPFEN_R_MAX			(TROPFEN_FAKTOR * (TROPFEN_UMFELD * 2))
+
+// anzahl tropfen
+#define TROPFEN_MAX				4
+
+typedef struct
+{
+	struct 
+	{
+		uint16_t x, y;		// mitte
+		uint16_t r, r_max;	// radius
+		uint8_t hue;
+	} tropfen[TROPFEN_MAX];
+} a_tropfen_t;
+
+void anim_tropfen_init()
+{
+	a_tropfen_t *d = (a_tropfen_t*)anim_buffer;
+	
+	memset(d, 0, sizeof(a_tropfen_t));
+}
+
+void anim_tropfen_step()
+{
+	a_tropfen_t *d = (a_tropfen_t*)anim_buffer;
+	rgb_t *col, c;
+	uint8_t x, y, t, xmin, xmax, ymin, ymax;
+	uint32_t temp;
+	int32_t tx, ty;
+	
+	for(x = 0; x < LED_NUM_X; x++)
+	{
+		for(y = 0; y < LED_NUM_Y; y++)
+		{
+			col = led.getLED(x, y);
+			
+			if(col->r > 100)
+			{
+				col->r -= 2;
+			}
+			else if(col->r)
+			{
+				col->r--;
+			}
+			
+			if(col->g > 100)
+			{
+				col->g -= 2;
+			}
+			else if(col->g)
+			{
+				col->g--;
+			}
+			
+			if(col->b > 100)
+			{
+				col->b -= 2;
+			}
+			else if(col->b)
+			{
+				col->b--;
+			}
+		}
+	}
+	
+	for(t = 0; t < TROPFEN_MAX; t++)
+	{
+		if(d->tropfen[t].r < d->tropfen[t].r_max)
+		{
+			// aktiv -> weiter rechnen
+			// umfeld bestimmen
+			xmin = d->tropfen[t].x / TROPFEN_FAKTOR;
+			xmax = d->tropfen[t].x / TROPFEN_FAKTOR;
+			if(xmin > TROPFEN_UMFELD)
+			{
+				xmin -= TROPFEN_UMFELD;
+			}
+			else
+			{
+				xmin = 0;
+			}
+			
+			if(xmax + TROPFEN_UMFELD < LED_NUM_X)
+			{
+				xmax += TROPFEN_UMFELD;
+			}
+			else
+			{
+				xmax = LED_NUM_X;
+			}
+			
+			ymin = d->tropfen[t].y / TROPFEN_FAKTOR;
+			ymax = d->tropfen[t].y / TROPFEN_FAKTOR;
+			if(ymin > TROPFEN_UMFELD)
+			{
+				ymin -= TROPFEN_UMFELD;
+			}
+			else
+			{
+				ymin = 0;
+			}
+			
+			if(ymax + TROPFEN_UMFELD < LED_NUM_Y)
+			{
+				ymax += TROPFEN_UMFELD;
+			}
+			else
+			{
+				ymax = LED_NUM_Y;
+			}
+			
+			// farben im umfeld neu berechnen
+			for(x = xmin; x < xmax; x++)
+			{
+				for(y = ymin; y < ymax; y++)
+				{
+					// entfernung berechnen
+					tx = ((int32_t)x * TROPFEN_FAKTOR) - (int32_t)d->tropfen[t].x;
+					ty = ((int32_t)y * TROPFEN_FAKTOR) - (int32_t)d->tropfen[t].y;
+					temp = (uint32_t)(tx * tx) + (uint32_t)(ty * ty);
+					temp = sqrt(temp);
+					
+					// neue farbe setzen
+					if(temp < d->tropfen[t].r)
+					{
+						led.setLED_HSV(&c, d->tropfen[t].hue - (temp / 4), 255, 255 - ((d->tropfen[t].r * 255) / (d->tropfen[t].r_max - 1)));
+						col = led.getLED(x, y);
+						
+						col->r |= c.r;
+						col->g |= c.g;
+						col->b |= c.b;
+					}
+				}
+			}
+			
+			d->tropfen[t].r++;
+			d->tropfen[t].r += (bpm_all / 100);
+		}
+		else
+		{
+			if(!beats)
+			{
+				continue;
+			}
+			// inaktiv -> neu belegen?
+			d->tropfen[t].hue = ((fft_bucket_h_l + fft_bucket_h_r) / 2 - (fft_bucket_l_l + fft_bucket_l_r) / 2) * 4; //rand();
+			d->tropfen[t].hue += bpm_l;
+			d->tropfen[t].x = rand() % TROPFEN_MAX_X;
+			d->tropfen[t].y = rand() % TROPFEN_MAX_Y;
+			d->tropfen[t].r = 0;
+			d->tropfen[t].r_max = (rand() % TROPFEN_R_MAX) * 0.6f;
+			beats = 0;
+		}
+	}
+	
+	led.update();
+}
+
+/*
+was mit amplitude
+*/
+#define ANIM_AMP1_NUM		7
+#define ANIM_AMP1_HUE_MA	16
+#define ANIM_AMP1_STEP		5
+
+typedef struct
+{
+	uint16_t val[ANIM_AMP1_NUM];
+	uint8_t huev[ANIM_AMP1_NUM];
+	uint8_t pos;
+	uint16_t hue;
+	uint8_t step;
+} a_amplitude1_t;
+
+void anim_amplitude1_init()
+{
+	a_amplitude1_t *d = (a_amplitude1_t*)anim_buffer;
+	
+	memset(d, 0, sizeof(a_amplitude1_t));
+	
+	d->step = ANIM_AMP1_STEP;
+}
+
+void anim_amplitude1_step()
+{
+	a_amplitude1_t *d = (a_amplitude1_t*)anim_buffer;
+	uint8_t i, p, min;
+	uint16_t rest;
+	
+	if(d->step)
+	{
+		d->step--;
+	}
+	else
+	{
+		d->step = ANIM_AMP1_STEP;
+		
+		d->pos = (d->pos + 1) % ANIM_AMP1_NUM;
+		d->val[d->pos] = (amplitude_l + amplitude_r) / 2;
+		if(d->val[d->pos] > 5000)
+		{
+			d->val[d->pos] = 5000;
+		}	
+	}
+	
+	d->hue = (((uint32_t)d->hue * (ANIM_AMP1_HUE_MA - 1)) + ((fft_bucket_h_l + fft_bucket_h_r) / 2) * 4) / ANIM_AMP1_HUE_MA;
+	d->huev[d->pos] = d->hue;
+	
+	led.clear();
+	
+	p = d->pos;
+	for(i = 0; i < ANIM_AMP1_NUM; i++)
+	{
+		min = (d->val[p] * LED_NUM_Y) / 6000;
+		rest = (d->val[p] * LED_NUM_Y) - (LED_NUM_Y * min);
+		
+		if(!rest)
+		{
+			led.setLED_HSV(i, min, d->huev[p], 255, 255);
+		}
+		else
+		{
+			led.setLED_HSV(i, min, d->huev[p], 255, 250 - (rest / 4));
+			if(min < (LED_NUM_Y - 1))
+			{
+				led.setLED_HSV(i, min + 1, d->huev[p], 255, rest / 4);
+			}
+		}
+		
+		p = (p + 1) % ANIM_AMP1_NUM;
+	}
+	
 	led.update();
 }
