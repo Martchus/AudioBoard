@@ -1,5 +1,5 @@
 /*
-Grundsystem, umrechnung FFT-Daten, kalibrierung
+basis system for calculations
 */
 
 #include <avr/io.h>
@@ -13,23 +13,24 @@ Grundsystem, umrechnung FFT-Daten, kalibrierung
 #include "ffft.h"
 #include "global.h"
 
-// nutzdaten
-uint16_t bands_l[ANIM_BAND_NUM], bands_r[ANIM_BAND_NUM];
-uint16_t amplitude_l, amplitude_r;
-uint8_t beats, bpm_h, bpm_m, bpm_l, bpm_all;
-uint8_t fft_bucket_h_l, fft_bucket_h_r, fft_bucket_l_l, fft_bucket_l_r;
+// nuser data l - left, r - right channel
+uint16_t bands_l[ANIM_BAND_NUM], bands_r[ANIM_BAND_NUM];					// value of the combined bands
+uint16_t amplitude_l, amplitude_r;											// amplitude
+uint8_t beats, bpm_h, bpm_m, bpm_l, bpm_all;								// bpm in high, mid, low or all ranges
+uint8_t fft_bucket_h_l, fft_bucket_h_r, fft_bucket_l_l, fft_bucket_l_r;		// highest/lowest FFT bucket
 
-// arbeitsdaten
-#define SPECTRUM_MA_NUM			16			// berechnung MA übers spektrum
+// working data
+#define SPECTRUM_MA_NUM			16			// MA over spectrum
 uint16_t ma_spectrum_low[SPECTRUM_MA_NUM], ma_spectrum_mid[SPECTRUM_MA_NUM], ma_spectrum_high[SPECTRUM_MA_NUM];
 uint8_t ma_spectrum_wpos, ma_spectrum_rpos;
-#define BPM_WMA_NUM				4			// berechnung WMA der bpm
+#define BPM_WMA_NUM				5			// WMA for BPM
 
-#define ANIM_INPUT_PER_SECOND	20		// anzahl aufrufe anim_input pro sekunde
+#define ANIM_INPUT_PER_SECOND	20		// number of calls of anim_input per second
 
 bands_calibration_t b_calib;
 bands_calibration_t EEMEM b_calib_eeprom;
 
+// init and load default calibration values
 void anim_init()
 {	
 	memset(bands_l, 0, sizeof(uint16_t) * ANIM_BAND_NUM);
@@ -74,11 +75,12 @@ void anim_init()
 
 void anim_frame()
 {
-	// TODO: animation einfügen
+	// TODO: add your code for your animation here
 }
 
 /*
-64 buckets, 250Hz/bucket -> 7 Bänder
+64 buckets, 250Hz/bucket -> 7 bands
+#	frequency range FFT bucket range
 0	0		250		0
 1	250		500		1
 2	500		1000	2 ... 3
@@ -86,6 +88,8 @@ void anim_frame()
 4	2000	4000	8 ... 15
 5	4000	8000	16 ... 31
 6	8000	ende	32 ... 63
+
+this function calculates combined bands, beats and some minor things from the FFT data
 */
 void anim_inputData(fft_result_t *left, fft_result_t *right)
 {
@@ -93,7 +97,7 @@ void anim_inputData(fft_result_t *left, fft_result_t *right)
 	uint8_t i;
 	static uint8_t cnt = 0, h_cnt = 0, m_cnt = 0, l_cnt = 0, all_cnt = 0;
 	
-	// bänder zusammenfassen
+	// bcombine bands
 	bands_l[0] = left->spectrum[0];
 	bands_r[0] = right->spectrum[0];
 	
@@ -150,7 +154,7 @@ void anim_inputData(fft_result_t *left, fft_result_t *right)
 	bands_l[6] = temp_l / 28;
 	bands_r[6] = temp_r / 28;
 	
-	// höchste/tiefste buckets suchen
+	// search highest/lowest buckest
 	fft_bucket_h_l = 0;
 	fft_bucket_h_r = 0;
 	fft_bucket_l_r = 255;
@@ -185,11 +189,11 @@ void anim_inputData(fft_result_t *left, fft_result_t *right)
 		}
 	}
 	
-	// amplitude merken
+	// save amplitude
 	amplitude_l = left->adc_max - left->adc_min;
 	amplitude_r = right->adc_max - right->adc_min;
 	
-	// moving mean übers spectrum
+	// MA over spectrum
 	temp_l = 0;
 	for(i = 0; i < 3; i++)
 	{
@@ -214,7 +218,7 @@ void anim_inputData(fft_result_t *left, fft_result_t *right)
 	ma_spectrum_rpos = ma_spectrum_wpos;
 	ma_spectrum_wpos = (ma_spectrum_wpos + 1) % SPECTRUM_MA_NUM;
 	
-	// abgleich/kalibrierung
+	// calibration
 	for(i = 0; i < ANIM_BAND_NUM; i++)
 	{
 		if(bands_l[i] > b_calib.bands_calib_l[i])
@@ -254,7 +258,7 @@ void anim_inputData(fft_result_t *left, fft_result_t *right)
 		amplitude_r = 0;
 	}
 	
-	// primitive beat erkennung
+	// simple beat detection
 	temp_h = 0;
 	temp_l = 0;
 	temp_m = 0;
@@ -312,41 +316,4 @@ void anim_inputData(fft_result_t *left, fft_result_t *right)
 		
 		cnt = 0;
 	}
-	
-#ifdef __INPUT_DEBUG__
-	// !!! debug
-	{
-		char str[4];
-		static uint16_t zoom = 20000;
-			
-		zoom += input.getEnc() * 1000;
-		
-		memset(str, 0, 4);
-		if(beats & BEAT_HIGH)
-		{
-			str[0] = 'H';
-		}
-		if(beats & BEAT_MID)
-		{
-			str[1] = 'M';
-		}
-		if(beats & BEAT_LOW)
-		{
-			str[2] = 'L';
-		}
-		
-		lcd.graph2(bands_l, bands_r, 7, zoom, 5);
-		lcd.print(0, 0, "%s", anim_list[anim_cur].name);
-#ifdef	__APS_DEBUG__
-		lcd.print(1, LCD_STYLE_NOCLEAR, "FPS:%02d  SPS:%02d   BPM", __fps, __sps);
-#else
-		lcd.print(1, LCD_STYLE_NOCLEAR, "                 BPM", __fps, __sps);
-#endif
-		lcd.print(2, LCD_STYLE_NOCLEAR | LCD_STYLE_RIGHT, "H:%03d", bpm_h);
-		lcd.print(3, LCD_STYLE_NOCLEAR | LCD_STYLE_RIGHT, "M:%03d", bpm_m);
-		lcd.print(4, LCD_STYLE_NOCLEAR | LCD_STYLE_RIGHT, "T:%03d", bpm_l);
-		lcd.print(5, LCD_STYLE_NOCLEAR | LCD_STYLE_RIGHT, "A:%03d", bpm_all);
-		lcd.print(7, LCD_STYLE_NOCLEAR | LCD_STYLE_RIGHT, "%u", zoom);
-	}
-#endif
 }

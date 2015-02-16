@@ -1,7 +1,5 @@
 /*
-ergebnis:
-adc_min/adc_max: min./max. analoger wert
-spectrum: 16kHz in 64 buckets -> 250Hz/bucket
+this module takes the audio data and calculates the FFT
 */
 #include <avr/io.h>
 #include <string.h>
@@ -10,7 +8,7 @@ spectrum: 16kHz in 64 buckets -> 250Hz/bucket
 #include "CFFT.h"
 #include "adc.h"
 
-// werte für reverse a-weighting
+// coefficients for reverse a-weighting
 const float PROGMEM fft_a_weight_tab[FFT_N / 2] = {
 0.736858111,
 1.107561091,
@@ -94,7 +92,8 @@ void CFFT::doFFT()
 	this->fft_state = FFT_STATE_PREP1;
 }
 
-// ret = FFT_STATE_IDLE: fertig; sonst: nicht fertig
+// returns FFT_STATE_IDLE: when done
+// does the FFT calculations step-by-step. needs to be called until it returns FFT_STATE_IDLE
 uint8_t CFFT::doStep()
 {
 	uint16_t i;
@@ -189,6 +188,7 @@ uint8_t CFFT::doStep()
 	return this->fft_state;
 }
 
+// get the FFT values for left/right channel
 fft_result_t *CFFT::getLeft()
 {
 	return &this->ch2;

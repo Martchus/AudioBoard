@@ -1,12 +1,15 @@
 /*
+this module samples the audio data
+
+used peripherals:
 ADCB CH0
 ADCA CH0
 
 DMA CH1
 DMA CH2
 
-Links: ADCA - channel2
-Rechts: ADBC - channel1
+ADCA - channel2
+ADBC - channel1
 
 TCC0
 */
@@ -54,6 +57,7 @@ void adc_init()
 	TCC0.PER = 999;
 }
 
+// starts the DMA process
 void adc_startSampling()
 {	
     DMA.CH1.CTRLA &= ~DMA_CH_ENABLE_bm;
@@ -103,6 +107,7 @@ void adc_startSampling()
 	adc_state = ADC_STATE_SAMPLING;
 }
 
+// check if DMA process is done
 void adc_check()
 {
 	if(!(DMA.CH1.CTRLB & (DMA_CH_CHBUSY_bm | DMA_CH_CHPEND_bm)) && (DMA.INTFLAGS & DMA_CH1TRNIF_bm))
@@ -121,6 +126,7 @@ void adc_check()
 	}
 }
 
+// dummy ISR
 ISR(TCC0_OVF_vect)
 {
 // 	ADCA.CH0.CTRL |= ADC_CH_START_bm;

@@ -1,6 +1,9 @@
 /*
-TCC1 - System timer
-TCC0 - Sampling
+this is the main file. you should only modify this at the marked locations
+
+used peripherals for all basic modules:
+TCC1 - systemt imer
+TCC0 - sampling timer
 
 TWIE - LCD
 
@@ -26,7 +29,7 @@ ADCB
 
 CFFT fft;
 
-volatile uint32_t systick;
+volatile uint32_t systick;			// system time [ms]
 
 #define FLAG_FRAME		0x01
 #define FLAG_100HZ		0x02
@@ -34,12 +37,7 @@ volatile uint32_t systick;
 #define FLAG_FFTDONE	0x08
 volatile uint8_t flags, adc_state;
 
-#ifdef __APS_DEBUG__
-uint32_t aps_tick = 0;
-uint8_t _fps = 0, _sps = 0, __fps = 0, __sps = 0;
-#endif
-
-// seed für zufallsgenerator erzeugen
+// generate seed for RNG
 unsigned short get_seed() {
 	unsigned short seed = 0;
 	unsigned short *p = (unsigned short*)(RAMEND + 1);
@@ -53,7 +51,7 @@ unsigned short get_seed() {
 
 int main(void)
 {
-	// auf ext. Clock umstellen und PLL aktivieren
+	// use external clock and activate PLL
 	OSC.XOSCCTRL = OSC_FRQRANGE_12TO16_gc | OSC_XOSCSEL_XTAL_16KCLK_gc;
 	OSC.CTRL |= OSC_XOSCEN_bm;
 	while(!(OSC.STATUS & OSC_XOSCRDY_bm))
@@ -65,16 +63,8 @@ int main(void)
 	CCP = CCP_IOREG_gc;
 	CLK.CTRL = CLK_SCLKSEL_PLL_gc;
 	OSC.CTRL &= ~OSC_RC2MEN_bm;
-
-	// interne 32MHz
-// 	OSC.CTRL |= OSC_RC32MEN_bm;
-// 	while(!(OSC.STATUS & OSC_RC32MRDY_bm))
-// 		;
-// 	CCP = CCP_IOREG_gc;
-// 	CLK.CTRL = CLK_SCLKSEL_RC32M_gc;
-// 	OSC.CTRL &= ~OSC_RC2MEN_bm;
 	
-	// Systemtimer	alle 1 ms
+	// system timer every ms
 	systick = 0;
 	TCC1.CTRLA = TC_CLKSEL_DIV1_gc;
 	TCC1.INTCTRLA = TC_OVFINTLVL_MED_gc;
@@ -96,33 +86,30 @@ int main(void)
 	
     while(1)
     {	
-		// sampling läuft
+		// check sampling
 		if(adc_state == ADC_STATE_SAMPLING)
 		{
 			adc_check();
 		}
 		
-		// alle 10 ms
+		// every 10 ms
 		if(flags & FLAG_100HZ)
 		{		
-			// TODO: Inputs abfragen uns auswerten
+			// TODO: important tasks, which needs to be checked every 10ms e.g. poll inputs
 			
 			flags &= ~FLAG_100HZ;
 		}
 		
-		// neues bild berechnen
+		// calculate new frame
 		else if(flags & FLAG_FRAME)
 		{
-#ifdef __APS_DEBUG__
-			_fps++;
-#endif
-			// TODO: Animations anpassen bzw. eigenes System schreiben
+			// TODO: change this function in animtion.cpp so it calculates the next frame and sends it to an output
 			anim_frame();
 
 			flags &= ~FLAG_FRAME;
 		}
 		
-		// neue Daten einlesen
+		// sample new data
 		else if((adc_state == ADC_STATE_IDLE) && (flags & FLAG_DOSAMPLE))
 		{
 			adc_startSampling();
@@ -130,14 +117,14 @@ int main(void)
 			flags &= ~FLAG_DOSAMPLE;
 		}
 		
-		// auswerten starten
+		// start calculations
 		else if(adc_state == ADC_STATE_SAMPLING_DONE)
 		{	
 			fft.doFFT();
 			adc_state = ADC_STATE_WAIT;
 		}
 		
-		 // auswerten
+		 // processing data
 		 else if(adc_state == ADC_STATE_WAIT)
 		 {
 			if(!fft.doStep())
@@ -147,34 +134,18 @@ int main(void)
 			}
 		 }
 		 
-		 // fft fertig -> was damit machen
+		 // fft done. put data into animation system
 		 else if(flags & FLAG_FFTDONE)
 		 {
-#ifdef __APS_DEBUG__
-			_sps++;
-#endif
 			anim_inputData(fft.getLeft(), fft.getRight()); 
 			flags &= ~FLAG_FFTDONE;
 		 }
 		
-		// sonst anderen kram
+		// if nothing else to do
 		else
 		{
-			// TODO: Sachen mit niedriger Priorität, z.B. Ausgabe auf ein Display
+			// TODO: here you can add unimportant tasks like sending data to a display
 		}
-		
-#ifdef __APS_DEBUG__
-		if(systick >= aps_tick)
-		{
-			aps_tick = systick + 1000;
-			
-			__fps = _fps;
-			__sps = _sps;
-			
-			_fps = 0;
-			_sps = 0;
-		}
-#endif
     }
 }
 

@@ -1,4 +1,7 @@
 /*
+this module is used to get data into the WS2812 LED. it uses DMA and USART to unload the CPU
+
+uses:
 USART C1 & DMA channel 0
 PC5: CLK
 PC6: RX
