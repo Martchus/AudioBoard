@@ -13,7 +13,9 @@ basis system for calculations
 #include "ffft.h"
 #include "global.h"
 
-// nuser data l - left, r - right channel
+extern CFFT fft;
+
+// user data l - left, r - right channel
 uint16_t bands_l[ANIM_BAND_NUM], bands_r[ANIM_BAND_NUM];					// value of the combined bands
 uint16_t amplitude_l, amplitude_r;											// amplitude
 uint8_t beats, bpm_h, bpm_m, bpm_l, bpm_all;								// bpm in high, mid, low or all ranges
